@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>消消乐小游戏</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --accent: #22d3ee;
+        --danger: #fb7185;
+        --board-bg: #1f2937;
+        --cell-size: min(10vw, 64px);
+        --gap: 6px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 50% 10%, #1e293b, var(--bg) 60%);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        color: var(--text);
+      }
+
+      .game {
+        width: min(96vw, 640px);
+        background: linear-gradient(180deg, #0b1221, var(--panel));
+        border: 1px solid #374151;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+      }
+
+      .top-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+
+      .stats {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .card {
+        background: #0b1324;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 8px 12px;
+        min-width: 110px;
+      }
+
+      .card .label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .card .value {
+        font-weight: 700;
+        font-size: 20px;
+        margin-top: 2px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      button {
+        border: 1px solid #0ea5b7;
+        background: linear-gradient(180deg, #0891b2, #0e7490);
+        color: #ecfeff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      button:hover {
+        filter: brightness(1.06);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .tip {
+        color: var(--muted);
+        margin: 0 0 10px 0;
+        font-size: 14px;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: repeat(8, var(--cell-size));
+        gap: var(--gap);
+        justify-content: center;
+        background: var(--board-bg);
+        padding: 10px;
+        border-radius: 14px;
+        border: 1px solid #374151;
+      }
+
+      .cell {
+        width: var(--cell-size);
+        height: var(--cell-size);
+        border-radius: 12px;
+        border: 2px solid transparent;
+        display: grid;
+        place-items: center;
+        font-size: calc(var(--cell-size) * 0.52);
+        user-select: none;
+        transition: transform 0.16s ease, border-color 0.16s ease,
+          filter 0.16s ease;
+        cursor: pointer;
+      }
+
+      .cell:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.06);
+      }
+
+      .cell.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
+      }
+
+      .cell.clearing {
+        animation: pop 220ms ease-in forwards;
+      }
+
+      @keyframes pop {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(0.2);
+          opacity: 0;
+        }
+      }
+
+      .footer {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.72);
+        display: none;
+        place-items: center;
+        z-index: 20;
+      }
+
+      .overlay.show {
+        display: grid;
+      }
+
+      .dialog {
+        width: min(92vw, 420px);
+        background: #0b1221;
+        border: 1px solid #334155;
+        border-radius: 14px;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .dialog h2 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .dialog p {
+        color: var(--muted);
+        margin: 10px 0 18px;
+      }
+
+      .color-0 {
+        background: #f87171;
+      }
+      .color-1 {
+        background: #fb923c;
+      }
+      .color-2 {
+        background: #facc15;
+      }
+      .color-3 {
+        background: #4ade80;
+      }
+      .color-4 {
+        background: #60a5fa;
+      }
+      .color-5 {
+        background: #c084fc;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game">
+      <div class="top-bar">
+        <div class="stats">
+          <div class="card">
+            <div class="label">分数</div>
+            <div id="score" class="value">0</div>
+          </div>
+          <div class="card">
+            <div class="label">剩余步数</div>
+            <div id="moves" class="value">30</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="restartBtn">重新开始</button>
+        </div>
+      </div>
+
+      <p class="tip">
+        玩法：点击两个相邻方块进行交换，凑成三个或以上相同颜色即可消除。
+      </p>
+
+      <section id="board" class="board" aria-label="消消乐棋盘"></section>
+      <p class="footer">连锁消除会额外加分，祝你好运！</p>
+    </main>
+
+    <div id="overlay" class="overlay" role="dialog" aria-modal="true">
+      <div class="dialog">
+        <h2 id="endTitle">游戏结束</h2>
+        <p id="endText"></p>
+        <button id="playAgainBtn">再来一局</button>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const BOARD_SIZE = 8;
+        const TYPES = 6;
+        const START_MOVES = 30;
+        const EMOJIS = ["🍓", "🍊", "🍋", "🍏", "🫐", "🍇"];
+
+        const boardEl = document.getElementById("board");
+        const scoreEl = document.getElementById("score");
+        const movesEl = document.getElementById("moves");
+        const restartBtn = document.getElementById("restartBtn");
+        const playAgainBtn = document.getElementById("playAgainBtn");
+        const overlayEl = document.getElementById("overlay");
+        const endTextEl = document.getElementById("endText");
+
+        let board = [];
+        let selected = null;
+        let score = 0;
+        let movesLeft = START_MOVES;
+        let busy = false;
+
+        function randomType() {
+          return Math.floor(Math.random() * TYPES);
+        }
+
+        function initBoard() {
+          board = Array.from({ length: BOARD_SIZE }, () =>
+            Array.from({ length: BOARD_SIZE }, () => randomType())
+          );
+
+          // 初始盘面不允许直接存在可消除组合。
+          rerollMatchedCells();
+        }
+
+        function cellKey(row, col) {
+          return `${row},${col}`;
+        }
+
+        function renderBoard() {
+          const selectedKey = selected ? cellKey(selected.row, selected.col) : "";
+          const fragment = document.createDocumentFragment();
+
+          for (let row = 0; row < BOARD_SIZE; row += 1) {
+            for (let col = 0; col < BOARD_SIZE; col += 1) {
+              const value = board[row][col];
+              const cell = document.createElement("button");
+              cell.className = `cell color-${value}`;
+              cell.type = "button";
+              cell.dataset.row = String(row);
+              cell.dataset.col = String(col);
+              cell.textContent = EMOJIS[value];
+              if (cellKey(row, col) === selectedKey) {
+                cell.classList.add("selected");
+              }
+              fragment.appendChild(cell);
+            }
+          }
+          boardEl.replaceChildren(fragment);
+        }
+
+        function renderStats() {
+          scoreEl.textContent = String(score);
+          movesEl.textContent = String(movesLeft);
+        }
+
+        function isAdjacent(a, b) {
+          return Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
+        }
+
+        function swapCells(a, b) {
+          const temp = board[a.row][a.col];
+          board[a.row][a.col] = board[b.row][b.col];
+          board[b.row][b.col] = temp;
+        }
+
+        function findMatches() {
+          const matched = new Set();
+
+          // 横向检查
+          for (let row = 0; row < BOARD_SIZE; row += 1) {
+            let count = 1;
+            for (let col = 1; col <= BOARD_SIZE; col += 1) {
+              const current = col < BOARD_SIZE ? board[row][col] : null;
+              const prev = board[row][col - 1];
+              if (current !== null && current === prev) {
+                count += 1;
+              } else {
+                if (count >= 3) {
+                  for (let k = 0; k < count; k += 1) {
+                    matched.add(cellKey(row, col - 1 - k));
+                  }
+                }
+                count = 1;
+              }
+            }
+          }
+
+          // 纵向检查
+          for (let col = 0; col < BOARD_SIZE; col += 1) {
+            let count = 1;
+            for (let row = 1; row <= BOARD_SIZE; row += 1) {
+              const current = row < BOARD_SIZE ? board[row][col] : null;
+              const prev = board[row - 1][col];
+              if (current !== null && current === prev) {
+                count += 1;
+              } else {
+                if (count >= 3) {
+                  for (let k = 0; k < count; k += 1) {
+                    matched.add(cellKey(row - 1 - k, col));
+                  }
+                }
+                count = 1;
+              }
+            }
+          }
+
+          return matched;
+        }
+
+        function rerollMatchedCells() {
+          while (true) {
+            const matches = findMatches();
+            if (matches.size === 0) break;
+            for (const key of matches) {
+              const [r, c] = key.split(",").map(Number);
+              board[r][c] = randomType();
+            }
+          }
+        }
+
+        function sleep(ms) {
+          return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        function markClearing(matches) {
+          for (const key of matches) {
+            const [row, col] = key.split(",").map(Number);
+            const index = row * BOARD_SIZE + col;
+            const cell = boardEl.children[index];
+            if (cell) cell.classList.add("clearing");
+          }
+        }
+
+        function removeMatches(matches) {
+          for (const key of matches) {
+            const [row, col] = key.split(",").map(Number);
+            board[row][col] = null;
+          }
+        }
+
+        function applyGravity() {
+          for (let col = 0; col < BOARD_SIZE; col += 1) {
+            let writeRow = BOARD_SIZE - 1;
+            for (let row = BOARD_SIZE - 1; row >= 0; row -= 1) {
+              if (board[row][col] !== null) {
+                board[writeRow][col] = board[row][col];
+                writeRow -= 1;
+              }
+            }
+            while (writeRow >= 0) {
+              board[writeRow][col] = randomType();
+              writeRow -= 1;
+            }
+          }
+        }
+
+        async function resolveBoard() {
+          let chain = 0;
+          while (true) {
+            const matches = findMatches();
+            if (matches.size === 0) break;
+            chain += 1;
+
+            markClearing(matches);
+            await sleep(200);
+
+            removeMatches(matches);
+            const gained = matches.size * 10 * chain;
+            score += gained;
+
+            applyGravity();
+            selected = null;
+            renderBoard();
+            renderStats();
+            await sleep(140);
+          }
+        }
+
+        function hasPossibleMove() {
+          for (let row = 0; row < BOARD_SIZE; row += 1) {
+            for (let col = 0; col < BOARD_SIZE; col += 1) {
+              const current = { row, col };
+              const candidates = [
+                { row, col: col + 1 },
+                { row: row + 1, col },
+              ];
+
+              for (const next of candidates) {
+                if (next.row >= BOARD_SIZE || next.col >= BOARD_SIZE) continue;
+                swapCells(current, next);
+                const canMatch = findMatches().size > 0;
+                swapCells(current, next);
+                if (canMatch) return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        function shuffleBoardUntilPlayable() {
+          let guard = 0;
+          while ((!hasPossibleMove() || findMatches().size > 0) && guard < 200) {
+            guard += 1;
+            for (let row = 0; row < BOARD_SIZE; row += 1) {
+              for (let col = 0; col < BOARD_SIZE; col += 1) {
+                board[row][col] = randomType();
+              }
+            }
+            rerollMatchedCells();
+          }
+        }
+
+        function gameOver() {
+          return movesLeft <= 0;
+        }
+
+        function showGameOver() {
+          endTextEl.textContent = `最终得分：${score} 分`;
+          overlayEl.classList.add("show");
+        }
+
+        async function onCellClick(event) {
+          if (busy || gameOver()) return;
+          const target = event.target.closest(".cell");
+          if (!target) return;
+
+          const row = Number(target.dataset.row);
+          const col = Number(target.dataset.col);
+          const current = { row, col };
+
+          if (!selected) {
+            selected = current;
+            renderBoard();
+            return;
+          }
+
+          if (selected.row === row && selected.col === col) {
+            selected = null;
+            renderBoard();
+            return;
+          }
+
+          if (!isAdjacent(selected, current)) {
+            selected = current;
+            renderBoard();
+            return;
+          }
+
+          busy = true;
+          swapCells(selected, current);
+          renderBoard();
+
+          const initialMatches = findMatches();
+          if (initialMatches.size === 0) {
+            await sleep(140);
+            swapCells(selected, current);
+            selected = null;
+            renderBoard();
+            busy = false;
+            return;
+          }
+
+          movesLeft -= 1;
+          renderStats();
+
+          await resolveBoard();
+          shuffleBoardUntilPlayable();
+          renderBoard();
+          renderStats();
+
+          if (gameOver()) {
+            showGameOver();
+          }
+          busy = false;
+        }
+
+        function startGame() {
+          if (busy) return;
+          selected = null;
+          score = 0;
+          movesLeft = START_MOVES;
+          busy = false;
+          overlayEl.classList.remove("show");
+
+          initBoard();
+          shuffleBoardUntilPlayable();
+          renderBoard();
+          renderStats();
+        }
+
+        boardEl.addEventListener("click", onCellClick);
+        restartBtn.addEventListener("click", startGame);
+        playAgainBtn.addEventListener("click", startGame);
+
+        startGame();
+      })();
+    </script>
+  </body>
+</html>
